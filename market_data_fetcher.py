@@ -2,6 +2,35 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np 
+from datetime import datetime, timedelta
+
+def fetch_us_10y_treasury_yield():
+    """
+    Récupère le rendement actuel du bon du Trésor américain à 10 ans.
+    Utilise le ticker ^TNX sur Yahoo Finance.
+    Retourne le rendement en décimal (ex: 0.045 pour 4.5%).
+    """
+    ticker_symbol = '^TNX' # Ticker pour le rendement du Trésor US à 10 ans
+    try:
+        # Récupérer les données sur une courte période pour obtenir le dernier prix de clôture
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=5) # Quelques jours d'historique
+        
+        data = yf.download(ticker_symbol, start=start_date, end=end_date)
+        
+        if not data.empty:
+            # Le rendement est généralement dans la colonne 'Close'
+            # Convertir explicitement en float pour éviter l'erreur de formatage
+            latest_yield_value = float(data['Close'].iloc[-1].item()) # <-- Modification ici
+            print(f"Rendement US 10Y récupéré : {latest_yield_value:.4f}%")
+            return latest_yield_value / 100 # Convertir en décimal
+        else:
+            print(f"Avertissement: Aucune donnée trouvée pour {ticker_symbol}.")
+            return None
+    except Exception as e:
+        print(f"Erreur lors de la récupération du rendement US 10Y: {e}")
+        return None
+
 
 def fetch_live_data(tickers_list): 
     """
@@ -31,7 +60,7 @@ def fetch_live_data(tickers_list):
                 spot_price = float(ticker_info['regularMarketPrice'])
             else:
                 # Fallback robuste au cas où .info ne donne pas de prix actuel
-                # Utilisez une période plus longue pour augmenter les chances d'avoir des données
+                # Utiliser une période plus longue pour augmenter les chances d'avoir des données
                 data_download = yf.download(ticker, period="5d", progress=False, actions=False)
                 if not data_download.empty:
                     # Prioriser 'Adj Close' si disponible, sinon 'Close'
@@ -98,3 +127,13 @@ if __name__ == "__main__":
     print("\nDonnées récupérées (test market_data_fetcher):")
     for ticker, values in data.items():
         print(f"  {ticker}: Spot Price={values['spot_price']:.2f}, Dividend Yield={values['dividend_yield']:.4f}")
+
+# Pour tester la fonction (peut être ajouté temporairement à la fin du fichier)
+if __name__ == '__main__':
+    # Test de la fonction pour le taux sans risque
+    yield_10y = fetch_us_10y_treasury_yield()
+    if yield_10y is not None:
+        # La ligne de print ici aussi doit utiliser la valeur directement, pas un objet Series
+        print(f"Rendement du Trésor US à 10 ans actuel: {yield_10y:.4f}")
+    else:
+        print("Impossible de récupérer le rendement du Trésor US à 10 ans.")
