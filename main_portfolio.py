@@ -35,9 +35,9 @@ positions = [
 
 
 # --- Configuration Email ---
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "sender@gmail.com") # to change
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "password") # to change
-RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "receiver@gmail.com") # to change
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "abcdef@gmail.com")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "xxxxxxxxxx")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "abcdef@gmail.com")
 
 # --- Fonction principale pour exécuter l'analyse et envoyer l'email ---
 def run_and_email_report():
