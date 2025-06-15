@@ -47,12 +47,12 @@ def send_email(subject, body, to_email, from_email, password, smtp_server='smtp.
 
 if __name__ == "__main__":
     # --- Configuration pour le test (ces valeurs sont à des fins de test du module) ---
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL", "sender@gmail.com") # to change
-    SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "password") # to change
-    RECEIVER_EMAIL = "receiver@gmail.com" # to change
+    SENDER_EMAIL = os.getenv("SENDER_EMAIL", "abcdef@gmail.com")
+    SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "xxxxxxxxxx")  # Utilisez un mot de passe d'application pour Gmail si l'authentification à deux facteurs est activée
+    RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL", "abcdef@gmail.com")
+
 
     # --- Modification : Vérifier si les identifiants ont été renseignés ---
-    
     if not SENDER_EMAIL or not SENDER_PASSWORD: 
         print("Veuillez configurer SENDER_EMAIL et SENDER_PASSWORD pour envoyer l'email de test.")
         print("Pour Gmail, utilisez un 'mot de passe d'application' si vous avez l'authentification à deux facteurs.")
