@@ -1,8 +1,9 @@
 # portfolio_reporter.py
 import pandas as pd
 from datetime import datetime
+import numpy as np # Assurez-vous d'importer numpy car nous utilisons np.nan
 
-def get_portfolio_report_html(df_portfolio, portfolio_summary):
+def get_portfolio_report_html(df_portfolio, portfolio_summary, options_valuation_details):
     """
     Génère un rapport de portefeuille formaté en HTML avec des styles inline
     pour une compatibilité maximale avec les clients de messagerie (y compris Gmail).
@@ -10,6 +11,7 @@ def get_portfolio_report_html(df_portfolio, portfolio_summary):
     Paramètres:
     df_portfolio (pd.DataFrame): DataFrame détaillé du portefeuille.
     portfolio_summary (dict): Dictionnaire récapitulatif du portefeuille.
+    options_valuation_details (list): Liste des dictionnaires avec les détails de valorisation des options. # NOUVEAU
 
     Retourne:
     str: Le rapport formaté en HTML.
@@ -27,84 +29,30 @@ def get_portfolio_report_html(df_portfolio, portfolio_summary):
     html_parts.append("<body style=\"font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; background-color: #f8f9fa; margin: 0; padding: 20px;\">")
 
     # Conteneur principal avec styles inline
-    html_parts.append("<div style=\"max-width: 800px; margin: 20px auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05);\">")
+    container_style = "max-width: 800px; margin: 20px auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05);"
+    html_parts.append(f"<div style=\"{container_style}\">")
 
-    # --- En-tête Général ---
-    html_parts.append("<h1 style=\"color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; margin-top: 0; font-size: 2em;\">Rapport d'Analyse de Portefeuille Iron Dome</h1>")
-    html_parts.append(f"<p style=\"font-size: 0.9em; color: #666; margin-bottom: 20px;\"><strong>Date du rapport :</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
+    # --- En-tête du rapport ---
+    header_style = "color: #2c3e50; text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e0e0e0; padding-bottom: 15px;"
+    h1_style = "font-size: 2em; margin: 0; padding: 0;"
+    p_date_style = "font-size: 0.9em; color: #7f8c8d; margin-top: 5px;"
+    html_parts.append(f"<div style=\"{header_style}\">")
+    html_parts.append(f"<h1 style=\"{h1_style}\">Rapport de Portefeuille Iron Dome</h1>")
+    html_parts.append(f"<p style=\"{p_date_style}\">Date du rapport : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
+    html_parts.append("</div>")
 
-    # --- Portefeuille Détaillé ---
-    html_parts.append("<h2 style=\"color: #34495e; border-bottom: 1px solid #dcdcdc; padding-bottom: 5px; margin-top: 25px; font-size: 1.5em;\">Portefeuille Détaillé 📈</h2>") # Emoji ajouté ici directement
-
-    df_portfolio_html = df_portfolio.copy()
-
-    # Formatage des colonnes numériques (Valeur Marché)
-    for col in ["Valeur Marché (€)"]:
-        if col in df_portfolio_html.columns:
-            df_portfolio_html[col] = pd.to_numeric(df_portfolio_html[col], errors='coerce')
-            df_portfolio_html[col] = df_portfolio_html[col].map('{:,.2f}'.format)
-    df_portfolio_html = df_portfolio_html.fillna('-')
-
-    # Styles inline pour P&L
-    profit_style = "color: #28a745; font-weight: bold;"   # Vert pour les gains
-    loss_style = "color: #dc3545; font-weight: bold;"     # Rouge pour les pertes
-    zero_style = "color: #6c757d; font-weight: bold;"     # Gris pour zéro
-
-    # Styles inline pour le tableau
-    table_style = "width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;"
-    th_style = "border: 1px solid #e9ecef; padding: 10px; text-align: left; background-color: #e2e6ea; color: #495057; font-weight: bold;"
-    td_style = "border: 1px solid #e9ecef; padding: 10px; text-align: left;"
-    tr_even_bg = "background-color: #fefefe;" # Fond clair pour les lignes paires
-
-    # Début du tableau HTML
-    html_parts.append(f"<table style=\"{table_style}\">")
-    html_parts.append("<thead><tr>")
-    for col in df_portfolio_html.columns:
-        html_parts.append(f"<th style=\"{th_style}\">{col}</th>")
-    html_parts.append("</tr></thead>")
-    html_parts.append("<tbody>")
-
-    # Génération des lignes du tableau avec styles inline
-    for i, row in df_portfolio_html.iterrows():
-        row_style = f"style=\"{tr_even_bg}\"" if i % 2 == 1 else "" # Appliquer le style pour les lignes paires
-        html_parts.append(f"<tr {row_style}>")
-        for col_name, cell_value in row.items():
-            final_cell_value = str(cell_value)
-            cell_specific_style = td_style
-
-            # Appliquer les styles conditionnels pour la colonne P&L (€)
-            if col_name == "P&L (€)":
-                try:
-                    num_val = float(str(cell_value).replace(',', '').replace('€', '').strip())
-                    if num_val > 0:
-                        cell_specific_style += profit_style # Ajoute le style vert
-                        final_cell_value = f"{num_val:,.2f}€"
-                    elif num_val < 0:
-                        cell_specific_style += loss_style # Ajoute le style rouge
-                        final_cell_value = f"{num_val:,.2f}€"
-                    else:
-                        cell_specific_style += zero_style # Ajoute le style gris
-                        final_cell_value = f"{num_val:,.2f}€"
-                except ValueError:
-                    pass # Si ce n'est pas un nombre, laisser tel quel
-
-            html_parts.append(f"<td style=\"{cell_specific_style}\">{final_cell_value}</td>")
-        html_parts.append("</tr>")
-    html_parts.append("</tbody>")
-    html_parts.append("</table>")
-
-    # --- Résumé du Portefeuille ---
-    html_parts.append("<h2 style=\"color: #34495e; border-bottom: 1px solid #dcdcdc; padding-bottom: 5px; margin-top: 25px; font-size: 1.5em;\">Résumé du Portefeuille 💰</h2>") # Emoji ici aussi
-    html_parts.append("<div style=\"background-color: #e9f5ff; padding: 15px; border-radius: 5px; margin-top: 20px;\">") # styles inline pour summary-section
-
-    summary_value_style = "font-weight: bold; color: #0056b3;" # Styles inline pour summary-value
-
+    # --- Résumé du portefeuille ---
+    html_parts.append("<h2 style=\"color: #2c3e50; font-size: 1.5em; margin-bottom: 15px;\">Résumé du Portefeuille</h2>")
+    summary_container_style = "background-color: #f0f3f6; border-left: 5px solid #3498db; padding: 15px 20px; margin-bottom: 25px; border-radius: 5px;"
+    p_item_style = "margin: 5px 0; font-size: 0.95em;"
+    summary_value_style = "font-weight: bold; color: #2c3e50;"
+    
+    html_parts.append(f"<div style=\"{summary_container_style}\">")
     for key, value in portfolio_summary.items():
-        # Utiliser un style inline directement pour le <p>
-        p_item_style = "margin-bottom: 8px;"
         if isinstance(value, (int, float)):
-            if "Valeur totale portefeuille" in key or "P&L total portefeuille" in key:
-                html_parts.append(f"<p style=\"{p_item_style}\"><strong>{key}:</strong> <span style=\"{summary_value_style}\">{value:,.2f}€</span></p>")
+            if "total portefeuille" in key or "P&L total portefeuille" in key:
+                color = "green" if value >= 0 else "red"
+                html_parts.append(f"<p style=\"{p_item_style}\"><strong>{key}:</strong> <span style=\"{summary_value_style}; color: {color};\">{value:,.2f}€</span></p>")
             elif "Exposition" in key:
                 html_parts.append(f"<p style=\"{p_item_style}\"><strong>{key}:</strong> <span style=\"{summary_value_style}\">{value:,.2f}%</span></p>")
             elif "Durée moyenne" in key:
@@ -115,13 +63,129 @@ def get_portfolio_report_html(df_portfolio, portfolio_summary):
             html_parts.append(f"<p style=\"{p_item_style}\"><strong>{key}:</strong> <span style=\"{summary_value_style}\">{value}</span></p>")
     html_parts.append("</div>")
 
+    # --- Tableau détaillé du portefeuille ---
+    html_parts.append("<h2 style=\"color: #2c3e50; font-size: 1.5em; margin-bottom: 15px;\">Détail des Positions</h2>")
+    table_style = "width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 0.9em;"
+    th_td_style = "padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd;"
+    th_style = f"{th_td_style} background-color: #f2f2f2; font-weight: bold; color: #333;"
+    td_style = f"{th_td_style} color: #555;"
+    
+    html_parts.append(f"<table style=\"{table_style}\">")
+    
+    # En-têtes du tableau
+    html_parts.append("<thead><tr>")
+    for col in df_portfolio.columns:
+        html_parts.append(f"<th style=\"{th_style}\">{col}</th>")
+    html_parts.append("</tr></thead>")
+    
+    # Corps du tableau
+    html_parts.append("<tbody>")
+    for index, row in df_portfolio.iterrows():
+        html_parts.append("<tr>")
+        for col in df_portfolio.columns:
+            value = row[col]
+            display_value = ""
+            cell_style = td_style
+
+            if isinstance(value, (int, float)):
+                if col == "Valeur Marché (€)" or col == "P&L (€)":
+                    display_value = f"{value:,.2f}€"
+                    if col == "P&L (€)": # Couleur pour P&L
+                        if value > 0:
+                            cell_style += " color: green;"
+                        elif value < 0:
+                            cell_style += " color: red;"
+                elif col == "Prix Achat":
+                    display_value = f"{value:,.2f}€" if pd.notna(value) else "-"
+                elif col == "Jours Restants":
+                    display_value = f"{int(value)}" if pd.notna(value) else "-"
+                elif col == "Quantité":
+                    display_value = f"{int(value)}"
+                else:
+                    display_value = f"{value:,.2f}" # Formatage par défaut pour d'autres floats
+            elif pd.isna(value):
+                display_value = "-"
+            else:
+                display_value = str(value)
+            
+            html_parts.append(f"<td style=\"{cell_style}\">{display_value}</td>")
+        html_parts.append("</tr>")
+    html_parts.append("</tbody>")
+    html_parts.append("</table>")
+
+
+    # --- NOUVELLE SECTION : Analyse de l'évaluation des Options ---
+    if options_valuation_details: # Seulement si nous avons des données d'options à analyser
+        html_parts.append("<h2 style=\"color: #2c3e50; font-size: 1.5em; margin-top: 30px; margin-bottom: 15px;\">Analyse d'Évaluation des Options</h2>")
+        
+        # Styles pour les blocs d'options individuels
+        option_block_style = "background-color: #e8f4f8; border: 1px solid #b3e0f2; padding: 15px; margin-bottom: 15px; border-radius: 5px;"
+        option_header_style = "font-weight: bold; color: #2c3e50; margin-bottom: 10px;"
+        option_item_style = "margin: 3px 0; font-size: 0.9em;"
+        interpretation_style_base = "font-weight: bold;"
+
+        for detail in options_valuation_details:
+            ticker = detail.get("ticker", "N/A")
+            strike = detail.get("strike", "N/A")
+            expiry = detail.get("expiry", "N/A")
+            option_type = detail.get("type", "N/A")
+            market_price = detail.get("market_price")
+            theoretical_price = detail.get("theoretical_price")
+            implied_volatility = detail.get("implied_volatility")
+            over_under_value = detail.get("over_under_value")
+            over_under_percent = detail.get("over_under_percent")
+
+            if pd.isna(market_price) or pd.isna(theoretical_price):
+                 html_parts.append(f"<div style=\"{option_block_style}\">")
+                 html_parts.append(f"<p style=\"{option_header_style}\">{ticker} {strike} {expiry} ({option_type.upper()})</p>")
+                 html_parts.append(f"<p style=\"{option_item_style}\">Impossible d'évaluer cette option (données manquantes ou invalides).</p>")
+                 html_parts.append("</div>")
+                 continue
+
+            html_parts.append(f"<div style=\"{option_block_style}\">")
+            html_parts.append(f"<p style=\"{option_header_style}\">{ticker} {strike} {expiry} ({option_type.upper()})</p>")
+            html_parts.append(f"<p style=\"{option_item_style}\">Prix du marché (Live) : <span style=\"font-weight: bold;\">{market_price:,.2f}€</span></p>")
+            html_parts.append(f"<p style=\"{option_item_style}\">Prix théorique (Modèle Binomial) : <span style=\"font-weight: bold;\">{theoretical_price:,.2f}€</span></p>")
+            html_parts.append(f"<p style=\"{option_item_style}\">Volatilité Implicite : <span style=\"font-weight: bold;\">{implied_volatility:.2%}</span></p>")
+            
+            interpretation = ""
+            interpretation_style = interpretation_style_base
+            if pd.notna(over_under_value):
+                html_parts.append(f"<p style=\"{option_item_style}\">Différence (Live - Théorique) : <span style=\"font-weight: bold;\">{over_under_value:,.2f}€</span> ({over_under_percent:,.2f}%)</p>")
+                
+                if over_under_value > 0.1: # Légèrement sur-évaluée
+                    interpretation = "Votre modèle sous-évalue l'option par rapport au marché."
+                    interpretation_style += " color: #c0392b;" # Rouge vif
+                    if over_under_percent > 5: # Si la différence est > 5%
+                         interpretation += " Cela peut indiquer une surévaluation potentielle par le marché."
+                         interpretation_style += " font-size: 1.05em;" # Un peu plus grand
+                elif over_under_value < -0.1: # Légèrement sous-évaluée
+                    interpretation = "Votre modèle surévalue l'option par rapport au marché."
+                    interpretation_style += " color: #27ae60;" # Vert vif
+                    if over_under_percent < -5: # Si la différence est < -5%
+                         interpretation += " Cela peut indiquer une sous-évaluation potentielle par le marché, et donc une opportunité d'achat."
+                         interpretation_style += " font-size: 1.05em;"
+                else: # Proche du prix théorique
+                    interpretation = "Le prix de marché est proche du prix théorique de votre modèle."
+                    interpretation_style += " color: #7f8c8d;" # Gris
+            else:
+                interpretation = "Impossible de calculer la sur/sous-évaluation pour cette option."
+                interpretation_style += " color: #7f8c8d;"
+
+            html_parts.append(f"<p style=\"{option_item_style} {interpretation_style}\">{interpretation}</p>")
+            html_parts.append("</div>")
+
     # --- Ajout de la signature ---
     footer_style = "margin-top: 30px; font-size: 0.85em; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 15px;"
     signature_style = "font-style: italic;"
-    html_parts.append(f"<p style=\"{footer_style}\">Rapport généré automatiquement par Iron Dome.<br><span style=\"{signature_style}\">Par Nolhan Mas</span>.</p>")
+    html_parts.append(f"<div style=\"{footer_style}\">")
+    html_parts.append(f"<p>Généré par <span style=\"{signature_style}\">Iron Dome V3</span></p>")
+    html_parts.append(f"<p style=\"font-weight: bold; margin-top: 5px;\">Fait par Nolhan Mas</p>")
+    html_parts.append("</div>")
 
     html_parts.append("</div>") # Fermeture du conteneur principal
     html_parts.append("</body>")
     html_parts.append("</html>")
+    
+    return "".join(html_parts)
 
-    return "\n".join(html_parts)
