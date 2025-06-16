@@ -188,7 +188,7 @@ if __name__ == "__main__":
         days_to_expiry_for_test = (expiry_dt_for_test - today_for_test).days
         T_for_test = days_to_expiry_for_test / 365.0
         
-        # --- NOUVEAU : Simuler un market_price réaliste en utilisant Black-Scholes ---
+        # --- Simuler un market_price réaliste en utilisant Black-Scholes ---
         # On utilise une volatilité estimée pour générer un prix cohérent
         estimated_volatility_for_test = 0.50 # Volatilité de 50% pour le test, une valeur plausible pour NVDA
         
