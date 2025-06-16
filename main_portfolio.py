@@ -94,7 +94,7 @@ if __name__ == "__main__":
     df_portfolio_sorted = df_portfolio.sort_values(by="Valeur Marché (€)", ascending=False)
 
     # 6. Générer le rapport en HTML 
-    html_report_output = get_portfolio_report_html(df_portfolio_sorted, portfolio_summary, options_valuation_details) # Nouveau paramètre
+    html_report_output = get_portfolio_report_html(df_portfolio_sorted, portfolio_summary, options_valuation_details) 
 
     # 7. Envoyer l'email avec le rapport HTML
     subject = f"Iron Dome - Rapport de Portefeuille US - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
