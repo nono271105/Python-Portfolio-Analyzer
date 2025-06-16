@@ -30,7 +30,7 @@ positions = [
     {"ticker": "LDOS", "type": "call", "qty": 50, "strike": 180.0, "expiry": "2025-12-19", "purchase_premium": "4.4"},
     {"ticker": "BAH", "type": "call", "qty": 16, "strike": 120.0, "expiry": "2025-12-19", "purchase_premium": "5.4"},
     {"ticker": "KTOS", "type": "call", "qty": 12, "strike": 55.0, "expiry": "2026-01-16", "purchase_premium": "3.60"},
-    {"ticker": "DFEN", "type": "etf", "qty": 30, "purchase_price": "45.00"},
+    {"ticker": "DFEN", "type": "etf", "qty": 1800, "purchase_price": "45.00"},
 ]
 
 # --- Configuration email (à configurer dans les variables d'environnement) ---
