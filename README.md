@@ -9,10 +9,11 @@ Ce script analyse un portefeuille construit autour d’ETF et d’options call s
 ## Fonctionnalités
 
 - Récupération de données de marché (prix spot des sous-jacents, rendements obligataires, **prix live Bid/Ask des options**)
+- **Calcul de Volatilité Historique annualisée (pour les sous-jacents des options)**
 - Calcul de volatilité implicite (`Bisection Method - Dichotomy`)
 - Pricing des options (**Modèle d'arbre binomial pour les calls américains**, et Black-Scholes si spécifié pour Européennes)
 - Évaluation du portefeuille (valeur, P&L, exposition, durée moyenne des positions d'options)
-- Génération d’un rapport synthétique **HTML** détaillé, incluant une analyse de sur/sous-évaluation des options.
+- Génération d’un rapport synthétique **HTML** détaillé, incluant une analyse de sur/sous-évaluation des options **et la comparaison Volatilité Implicite vs. Volatilité Historique**.
 - **Envoi automatisé et sécurisé des rapports par e-mail**
 
 ---
@@ -22,7 +23,7 @@ Ce script analyse un portefeuille construit autour d’ETF et d’options call s
 - `main_portfolio.py` : Point d'entrée principal pour l'exécution du rapport, orchestre la récupération des données, l'analyse et la génération du rapport.
 - `portfolio_analyzer.py` : Effectue les calculs détaillés des valeurs de marché, du P&L et des métriques d'exposition pour chaque position.
 - `portfolio_reporter.py` : Génère le rapport HTML synthétique et détaillé du portefeuille, y compris les interprétations des valorisations d'options.
-- `market_data_fetcher.py` : Gère la récupération des données de marché (prix spot des sous-jacents, rendements obligataires, **chaîne d'options live de Yahoo Finance**).
+- `market_data_fetcher.py` : Gère la récupération des données de marché (prix spot des sous-jacents, rendements obligataires, **chaîne d'options live de Yahoo Finance, et données historiques pour la volatilité**).
 - `implied_volatility_calculator.py` : Estime la volatilité implicite des options en utilisant la méthode de la dichotomie, **en se basant sur le prix de marché fourni**.
 - `option_pricing.py` : Contient les implémentations des modèles de valorisation d'options : Black-Scholes (pour options européennes) et **Arbre Binomial (pour options américaines)**.
 - `email_reporter.py` : Gère l'envoi des rapports générés par e-mail de manière sécurisée.
@@ -105,7 +106,7 @@ python main_portfolio.py
 
 **Affichage (en console ou dans le log si automatisé) :**
 
-* Volatilité implicite (IV) et Rendements de dividende des sous-jacents
+* Volatilité implicite (IV), **Volatilité historique des sous-jacents**, et Rendements de dividende des sous-jacents
 * Valorisation par position
 * P&L total et par actif
 * Répartition ETF vs dérivés
