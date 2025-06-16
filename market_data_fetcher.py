@@ -1,7 +1,7 @@
 # market_data_fetcher.py
 import yfinance as yf
 import pandas as pd
-import numpy as np 
+import numpy as np
 from datetime import datetime, timedelta
 
 def fetch_us_10y_treasury_yield():
@@ -16,10 +16,10 @@ def fetch_us_10y_treasury_yield():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=5) # Quelques jours d'historique
         
-        data = yf.download(ticker_symbol, start=start_date, end=end_date)
+        data = yf.download(ticker_symbol, start=start_date, end=end_date, auto_adjust=True)
         
         if not data.empty:
-            latest_yield_value = float(data['Close'].iloc[-1].item()) 
+            latest_yield_value = float(data['Close'].iloc[-1].item())
             print(f"Rendement US 10Y récupéré : {latest_yield_value:.4f}%")
             return latest_yield_value / 100 # Convertir en décimal
         else:
@@ -30,7 +30,7 @@ def fetch_us_10y_treasury_yield():
         return None
 
 
-def fetch_live_data(tickers_list): 
+def fetch_live_data(tickers_list):
     """
     Récupère les prix spot actuels et les rendements de dividende pour une liste de tickers.
 
@@ -81,10 +81,10 @@ def fetch_live_data(tickers_list):
                 dividend_yield = ticker_info.get('trailingAnnualDividendYield') # Fallback pour les dividendes passés
 
             if dividend_yield is None or pd.isna(dividend_yield):
-                dividend_yield = 0.00 # <-- Votre valeur par défaut de 4.00% si aucune info n'est trouvée
+                dividend_yield = 0.00 # Votre valeur par défaut si aucune info n'est trouvée
 
-            if dividend_yield > 0.1: 
-                dividend_yield /= 100.0 
+            if dividend_yield > 0.1:
+                dividend_yield /= 100.0
 
             # Assurez-vous que le prix spot est valide avant d'ajouter à live_data
             if spot_price is not None and pd.notna(spot_price) and spot_price > 0:
@@ -107,7 +107,7 @@ def fetch_live_data(tickers_list):
             "LDOS": {"spot_price": 149.16, "dividend_yield": 0.0105},
             "BAH": {"spot_price": 103.30, "dividend_yield": 0.0201},
             "KTOS": {"spot_price": 41.76, "dividend_yield": 0.00},
-            "DFEN": {"spot_price": 45.60, "dividend_yield": 0.00} 
+            "DFEN": {"spot_price": 45.60, "dividend_yield": 0.00}
         }
     
     print("Live data fetched successfully.")
@@ -147,13 +147,15 @@ def fetch_live_option_data(option_positions, spot_prices_by_ticker):
             yf_ticker = yf.Ticker(ticker)
             
             # --- Vérifier si la date d'expiration est disponible ---
+            # available_expiries est correctement défini ici
             available_expiries = yf_ticker.options
+            
             if expiry_date_str not in available_expiries:
                 print(f"Option Data Warning: Expiry date {expiry_date_str} not found in available options for {ticker}. Skipping this option.")
                 live_option_data[f"{ticker}-{strike}-{expiry_date_str}-{option_type}"] = {
                     "bid": np.nan, "ask": np.nan, "lastPrice": np.nan, "mid_price": np.nan, "found": False
                 }
-                continue 
+                continue # Passer à l'option suivante
 
             option_chain = yf_ticker.option_chain(expiry_date_str)
             
@@ -193,7 +195,7 @@ def fetch_live_option_data(option_positions, spot_prices_by_ticker):
                 print(f"  Found {ticker} {strike} {expiry_date_str} ({option_type}): Using Last Price={last_price:.2f}")
             else:
                 print(f"  Warning: No valid price (bid/ask/lastPrice > 0) for {ticker} {strike} {expiry_date_str}.")
-                mid_price = np.nan 
+                mid_price = np.nan
 
             # Construire une clé unique pour l'option
             option_key = f"{ticker}-{strike}-{expiry_date_str}-{option_type}"
@@ -214,6 +216,58 @@ def fetch_live_option_data(option_positions, spot_prices_by_ticker):
     print("Live option data fetching complete.")
     return live_option_data
 
+def calculate_historical_volatility(ticker, period="60d"):
+    """
+    Calcule la volatilité historique annualisée pour un ticker donné.
+
+    Paramètres:
+    ticker (str): Symbole boursier de l'actif.
+    period (str): Période historique pour le calcul (ex: '60d', '1y', '5y').
+                  Utilise les données de clôture ajustées.
+
+    Retourne:
+    float: Volatilité historique annualisée, ou np.nan si les données sont insuffisantes.
+    """
+    try:
+        # Télécharger les données historiques
+        data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+
+        if data.empty:
+            print(f"Avertissement: Aucune donnée historique trouvée pour {ticker} sur la période {period}. Impossible de calculer la volatilité historique.")
+            return np.nan
+
+        # Utiliser les prix de clôture ajustés (Adj Close) ou de clôture (Close)
+        if 'Adj Close' in data.columns:
+            prices = data['Adj Close']
+        elif 'Close' in data.columns:
+            prices = data['Close']
+        else:
+            print(f"Avertissement: Ni 'Adj Close' ni 'Close' trouvés pour {ticker}. Impossible de calculer la volatilité historique.")
+            return np.nan
+
+        # Calculer les rendements quotidiens (log returns sont souvent préférés pour la volatilité)
+        returns = np.log(prices / prices.shift(1)).dropna()
+
+        if returns.empty:
+            print(f"Avertissement: Pas assez de données de rendement pour {ticker} sur la période {period}. Impossible de calculer la volatilité historique.")
+            return np.nan
+
+        # Calculer l'écart type des rendements quotidiens
+        # Ajout de .item() pour s'assurer que daily_volatility est un scalaire
+        daily_volatility = returns.std().item() if not returns.empty else np.nan
+
+        if pd.isna(daily_volatility):
+            return np.nan
+
+        # Annualiser la volatilité (en supposant 252 jours de bourse par an)
+        annualized_volatility = daily_volatility * np.sqrt(252)
+
+        print(f"Volatilité historique annualisée ({period}) pour {ticker}: {annualized_volatility:.4f}")
+        return annualized_volatility
+
+    except Exception as e:
+        print(f"Erreur lors du calcul de la volatilité historique pour {ticker}: {e}")
+        return np.nan
 
 # Pour tester ce module indépendamment
 if __name__ == "__main__":
@@ -232,8 +286,8 @@ if __name__ == "__main__":
         {"ticker": "LDOS", "type": "call", "qty": 50, "strike": 180.0, "expiry": "2025-12-19"},
         {"ticker": "BAH", "type": "call", "qty": 16, "strike": 120.0, "expiry": "2025-12-19"},
         {"ticker": "KTOS", "type": "call", "qty": 12, "strike": 55.0, "expiry": "2026-01-16"},
-        {"ticker": "DFEN", "type": "etf"}, 
-        {"ticker": "AAPL", "type": "stock"}, 
+        {"ticker": "DFEN", "type": "etf"},
+        {"ticker": "AAPL", "type": "stock"},
     ]
 
     # Collecter tous les tickers uniques des sous-jacents
@@ -257,3 +311,17 @@ if __name__ == "__main__":
     for opt_key, values in live_options_data.items():
         status = "Trouvé" if values["found"] else "Non trouvé"
         print(f"  {opt_key}: Mid Price={values['mid_price']:.2f}, Bid={values['bid']:.2f}, Ask={values['ask']:.2f} (Status: {status})")
+    
+    # --- Ajout pour le test de ce module indépendamment (optionnel) ---
+    print("\n--- Test de la Volatilité Historique ---")
+    test_tickers_for_hv = ["LDOS", "BAH", "KTOS", "AAPL"]
+    for ticker in test_tickers_for_hv:
+        hv_60d = calculate_historical_volatility(ticker, period="60d")
+        if pd.notna(hv_60d):
+            print(f"HV (60j) pour {ticker}: {hv_60d:.4f}")
+        else:
+            print(f"Échec du calcul HV pour {ticker}")
+
+    hv_1y = calculate_historical_volatility("LDOS", period="1y")
+    if pd.notna(hv_1y):
+        print(f"HV (1an) pour LDOS: {hv_1y:.4f}")
