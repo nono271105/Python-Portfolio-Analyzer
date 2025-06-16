@@ -1,4 +1,3 @@
-
 # Python Portfolio Analyzer
 
 **Outil Python d’analyse de portefeuille exposé aux thématiques défense & géopolitique.**
@@ -9,24 +8,24 @@ Ce script analyse un portefeuille construit autour d’ETF et d’options call s
 
 ## Fonctionnalités
 
-- Récupération de données de marché (prix spot, dividendes)
+- Récupération de données de marché (prix spot des sous-jacents, rendements obligataires, **prix live Bid/Ask des options**)
 - Calcul de volatilité implicite (`Bisection Method - Dichotomy`)
-- Pricing des options (Black-Scholes)
-- Évaluation du portefeuille (valeur, P&L, exposition)
-- Génération d’un rapport synthétique **HTML**
+- Pricing des options (**Modèle d'arbre binomial pour les calls américains**, et Black-Scholes si spécifié pour Européennes)
+- Évaluation du portefeuille (valeur, P&L, exposition, durée moyenne des positions d'options)
+- Génération d’un rapport synthétique **HTML** détaillé, incluant une analyse de sur/sous-évaluation des options.
 - **Envoi automatisé et sécurisé des rapports par e-mail**
 
 ---
 
 ## Structure des fichiers
 
-- `main_portfolio.py` : Point d'entrée principal pour l'exécution du rapport.
-- `portfolio_analyzer.py` : Effectue les calculs et la consolidation des positions du portefeuille.
-- `portfolio_reporter.py` : Génère le rapport HTML synthétique du portefeuille.
-- `market_data_fetcher.py` : Gère la récupération des données de marché (prix spot, rendements obligataires) via Yahoo Finance.
-- `implied_volatility_calculator.py` : Estime la volatilité implicite des options en utilisant la méthode de la dichotomie.
-- `option_pricing.py` : Calcule le prix des options call selon le modèle de Black-Scholes.
-- `email_reporter.py` : Gère l'envoi des rapports générés par e-mail.
+- `main_portfolio.py` : Point d'entrée principal pour l'exécution du rapport, orchestre la récupération des données, l'analyse et la génération du rapport.
+- `portfolio_analyzer.py` : Effectue les calculs détaillés des valeurs de marché, du P&L et des métriques d'exposition pour chaque position.
+- `portfolio_reporter.py` : Génère le rapport HTML synthétique et détaillé du portefeuille, y compris les interprétations des valorisations d'options.
+- `market_data_fetcher.py` : Gère la récupération des données de marché (prix spot des sous-jacents, rendements obligataires, **chaîne d'options live de Yahoo Finance**).
+- `implied_volatility_calculator.py` : Estime la volatilité implicite des options en utilisant la méthode de la dichotomie, **en se basant sur le prix de marché fourni**.
+- `option_pricing.py` : Contient les implémentations des modèles de valorisation d'options : Black-Scholes (pour options européennes) et **Arbre Binomial (pour options américaines)**.
+- `email_reporter.py` : Gère l'envoi des rapports générés par e-mail de manière sécurisée.
 - `requirements.txt` : Liste toutes les dépendances Python nécessaires au projet.
 
 ---
@@ -56,7 +55,7 @@ Le système est conçu pour un déploiement robuste et une exécution automatis�
 
 ### 1. Préparation de la VM
 
-* **Copiez les fichiers du projet :** Transférez tous les fichiers du projet (`.py`, `requirements.txt`, etc.) de votre machine locale vers un répertoire dédié sur la VM (ex: `/home/votrenomutilisateur/iron/`) 
+* **Copiez les fichiers du projet :** Transférez tous les fichiers du projet (`.py`, `requirements.txt`, etc.) de votre machine locale vers un répertoire dédié sur la VM (ex: `/home/votrenomutilisateur/iron/`)
 
 * **Installez les dépendances sur la VM :** Une fois les fichiers copiés sur la VM, connectez-vous en SSH, naviguez dans le répertoire du projet, activez l'environnement virtuel et installez les dépendances :
     ```bash
@@ -87,7 +86,7 @@ Les rapports sont automatiquement générés et envoyés par e-mail deux fois pa
     0 20 * * * SENDER_EMAIL="votre_email@gmail.com" SENDER_PASSWORD="votre_mot_de_passe_app" RECEIVER_EMAIL="votre_email_dest@example.com" /home/xxxx/myenv/bin/python /home/xxxx/iron/main_portfolio.py >> /home/xxxx/cron_output.log 2>&1
     ```
 
-* **Suivi et débogage :** La sortie des exécutions Cron est redirigée vers `/home/nolhanmas/cron_output.log`. Vous pouvez le consulter pour vérifier le bon déroulement ou diagnostiquer des erreurs :
+* **Suivi et débogage :** La sortie des exécutions Cron est redirigée vers `/home/xxxx/cron_output.log`. Vous pouvez le consulter pour vérifier le bon déroulement ou diagnostiquer des erreurs :
     ```bash
     cat /home/xxxx/cron_output.log
     # ou pour un suivi en temps réel :
@@ -116,7 +115,7 @@ python main_portfolio.py
 
 ## Limitations
 
-* Utilisation du modèle de Black-Scholes sur des options américaines (le modèle est théoriquement pour les options européennes).
+* **Actuellement, la valorisation des options et le calcul de la volatilité implicite sont principalement implémentés pour les options d'achat (calls).**
 * Dépendance des données à l'API de Yahoo Finance.
 
 ---
@@ -129,8 +128,8 @@ Fournir une base robuste et automatisée pour suivre des portefeuilles avec une 
 
 ## Améliorations Possibles
 
+* Ajouter la possibilité de valoriser et d'analyser les options de vente (puts).
 * Ajouter la possibilité de changer dynamiquement la composition du portefeuille via un fichier de configuration externe (ex : JSON, CSV).
 * Intégrer d'autres modèles d'évaluation d'options (ex: Monte Carlo pour les options américaines).
 * Gérer les erreurs d'API de manière plus robuste (ex: retries, backoff).
-
----
+* Améliorer l'interface utilisateur ou ajouter des visualisations.
