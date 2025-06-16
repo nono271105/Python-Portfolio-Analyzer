@@ -29,137 +29,106 @@ def find_implied_volatility_bisection(market_price, S, K, T, r, q=0, tol=1e-6, m
         return np.nan # IV non définie pour options expirées ou paramètres invalides
 
     # Définition des bornes comme dans votre code VBA
-    high_sigma = 5.0  # Représente 500%
-    low_sigma = 0.001 # Une volatilité de 0 est souvent problématique, donc une petite valeur > 0
+    high_sigma = 5.0  # Représente une volatilité très élevée
+    low_sigma = 0.001 # Représente une volatilité très faible
 
-    # Vérification initiale si la solution est dans l'intervalle
-    price_at_low = black_scholes_call(S, K, T, r, low_sigma, q)
-    price_at_high = black_scholes_call(S, K, T, r, high_sigma, q)
+    # Vérification initiale pour s'assurer que le prix du marché est entre les bornes
+    # du modèle avec low_sigma et high_sigma
+    try:
+        price_at_low = black_scholes_call(S, K, T, r, low_sigma, q)
+        price_at_high = black_scholes_call(S, K, T, r, high_sigma, q)
 
-    # S'assurer que le prix de marché est entre les bornes
-    # Attention: Utilisez une condition OR, car market_price pourrait être entre price_at_high et price_at_low
-    # si low_sigma et high_sigma étaient initialement inversés ou si market_price est très faible/élevé
-    # Une meilleure approche est de s'assurer que price_at_low < market_price < price_at_high après ajustement des bornes si nécessaire.
-    # Pour la dichotomie, il faut que f(low_sigma) et f(high_sigma) aient des signes opposés par rapport à la cible.
-    # Ici, nous cherchons price(sigma) = market_price. Donc nous voulons price_at_low < market_price et market_price < price_at_high
-    
-    # Cas où le prix de marché est plus bas que ce qu'une volatilité minimale donnerait
-    # (cela peut arriver pour des options très OTM dont le prix de marché est très bas)
-    if market_price < price_at_low:
-        # La IV serait inférieure à low_sigma, ou le prix est trop bas pour être solvable.
-        return np.nan
-    
-    # Cas où le prix de marché est plus haut que ce qu'une volatilité maximale donnerait
-    # (cela peut arriver pour des options très ITM dont le prix de marché est très haut,
-    # ou pour des prix de marché aberrants)
-    if market_price > price_at_high:
-        # La IV serait supérieure à high_sigma.
+        if market_price < price_at_low or market_price > price_at_high:
+            # Le prix du marché est en dehors des bornes atteignables par le modèle
+            # avec les volatilités low_sigma et high_sigma.
+            # print(f"Warning: Market price {market_price:.2f} is outside Black-Scholes bounds for S={S}, K={K}, T={T}, r={r}, q={q}.")
+            # print(f"Price at low_sigma ({low_sigma:.4f}): {price_at_low:.2f}, Price at high_sigma ({high_sigma:.4f}): {price_at_high:.2f}")
+            return np.nan # Ne peut pas trouver une IV valide dans les bornes
+    except Exception as e:
+        # print(f"Error during initial Black-Scholes check in IV solver: {e}")
         return np.nan
 
-    for i in range(max_iterations):
-        mid_sigma = (high_sigma + low_sigma) / 2
+
+    for _ in range(max_iterations):
+        mid_sigma = (low_sigma + high_sigma) / 2
+        if mid_sigma == 0: # Éviter la division par zéro si mid_sigma devient 0
+            break
         
-        # Condition de convergence
-        if (high_sigma - low_sigma) < tol:
+        try:
+            # Assurez-vous que black_scholes_call est correctement importé ou défini
+            model_price = black_scholes_call(S, K, T, r, mid_sigma, q)
+        except Exception as e:
+            # print(f"Error calculating model price in IV solver: {e}")
+            return np.nan # Gérer les erreurs de calcul du modèle
+
+        diff = model_price - market_price
+
+        if abs(diff) < tol:
             return mid_sigma
-        
-        # Calcul du prix Black-Scholes avec la volatilité moyenne
-        bs_price_mid = black_scholes_call(S, K, T, r, mid_sigma, q)
-        
-        # Ajustement des bornes
-        if bs_price_mid > market_price:
-            high_sigma = mid_sigma
-        else:
+        elif diff < 0: # Le prix du modèle est trop bas, augmenter sigma
             low_sigma = mid_sigma
-            
-    return (high_sigma + low_sigma) / 2 # Retourne la meilleure approximation après max_iterations
+        else: # Le prix du modèle est trop haut, diminuer sigma
+            high_sigma = mid_sigma
+    
+    return np.nan # Non convergent après max_iterations
 
 
 # --- Main function to fetch option data and calculate IV ---
-def get_implied_volatility_for_option(ticker, strike, expiry_date_str, current_spot_price, risk_free_rate, dividend_yield):
+# SIGNATURE DE LA FONCTION MODIFIÉE ICI
+def get_implied_volatility_for_option(ticker, strike, expiry, spot_price, risk_free_rate, dividend_yield, option_type="call", market_price=None):
     """
-    Récupère les données d'option de yfinance et calcule la volatilité implicite.
+    Fonction principale pour obtenir la volatilité implicite d'une option.
 
     Paramètres:
-    ticker (str): Symbole du sous-jacent (ex: "LDOS").
+    ticker (str): Symbole du ticker de l'actif sous-jacent.
     strike (float): Prix d'exercice de l'option.
-    expiry_date_str (str): Date d'échéance au format "YYYY-MM-DD".
-    current_spot_price (float): Prix actuel du sous-jacent.
-    risk_free_rate (float): Taux d'intérêt sans risque.
-    dividend_yield (float): Rendement des dividendes.
+    expiry (str): Date d'expiration de l'option au format 'YYYY-MM-DD'. # NOM DE PARAMÈTRE MODIFIÉ
+    spot_price (float): Prix spot actuel de l'actif sous-jacent.
+    risk_free_rate (float): Taux d'intérêt sans risque annuel.
+    dividend_yield (float): Rendement des dividendes annuel de l'actif sous-jacent.
+    option_type (str): 'call' ou 'put'. (Ajouté)
+    market_price (float): Le prix de marché de l'option (prix mid). (Ajouté)
 
     Retourne:
-    float: La volatilité implicite calculée, ou la volatilité par défaut si échec.
+    float: La volatilité implicite calculée, ou np.nan si impossible.
     """
-    default_volatility = 0.55 # Volatilité par défaut si le calcul échoue ou échoue à trouver un prix de marché valide.
+    if option_type.lower() != "call":
+        # Pour le moment, notre solveur d'IV est pour les calls via Black-Scholes Call
+        # Il faudrait un modèle Black-Scholes Put et un solveur d'IV pour les puts.
+        print(f"Warning: Implied volatility calculation is currently supported only for Call options. {option_type} was given for {ticker} {strike} {expiry}.")
+        return np.nan
 
-    # 1. Vérifier la validité des inputs
-    if current_spot_price <= 0 or strike <= 0:
-        print(f"IV Calc Warning: Invalid spot ({current_spot_price:.2f}) or strike ({strike:.2f}) for {ticker}. Using default volatility.")
-        return default_volatility
+    # Utilisation du market_price passé en paramètre, PAS DE NOUVEL APPEL YFINANCE ICI
+    if market_price is None or pd.isna(market_price) or market_price <= 0:
+        print(f"Warning: Market price for {ticker} {strike} {expiry} is invalid or missing ({market_price}). Cannot calculate IV.")
+        return np.nan
 
-    # 2. Convertir la date d'échéance
-    today = datetime.today()
     try:
-        expiry_dt = datetime.strptime(expiry_date_str, "%Y-%m-%d")
-    except ValueError:
-        print(f"IV Calc Warning: Invalid expiry date format for {ticker}: {expiry_date_str}. Using default volatility.")
-        return default_volatility
+        # Convertir la date d'expiration en objet datetime et calculer T
+        today = datetime.now()
+        expiry_dt = datetime.strptime(expiry, "%Y-%m-%d")
+        days_to_expiry = (expiry_dt - today).days
 
-    time_to_expiry_days = (expiry_dt - today).days
-    if time_to_expiry_days <= 0:
-        print(f"IV Calc Warning: Option for {ticker} is expired or expiring today ({expiry_date_str}). Using default volatility.")
-        return default_volatility
-    T = time_to_expiry_days / 365.0
+        if days_to_expiry <= 0:
+            return np.nan # Option expirée ou expirant aujourd'hui
 
-    # 3. Récupérer les données de la chaîne d'options
-    try:
-        yf_ticker = yf.Ticker(ticker)
-        # yfinance.option_chain() requiert la date au format 'YYYY-MM-DD'
-        option_chain = yf_ticker.option_chain(expiry_date_str)
-        calls = option_chain.calls
+        T = days_to_expiry / 365.0
+
+        # Utilisez le solveur de dichotomie
+        implied_vol = find_implied_volatility_bisection(
+            market_price=market_price,
+            S=spot_price,
+            K=strike,
+            T=T,
+            r=risk_free_rate,
+            q=dividend_yield
+        )
+        return implied_vol
     except Exception as e:
-        print(f"IV Calc Error: Could not fetch option chain for {ticker} (Expiry: {expiry_date_str}). Error: {e}. Using default volatility.")
-        return default_volatility
+        print(f"Erreur générale lors de la récupération/calcul de l'IV pour {ticker} {strike} {expiry}: {e}")
+        return np.nan
 
-    # 4. Trouver l'option spécifique par Strike
-    target_option = calls[calls['strike'] == strike]
 
-    if target_option.empty:
-        print(f"IV Calc Warning: Call option with strike {strike} and expiry {expiry_date_str} not found for {ticker}. Using default volatility.")
-        return default_volatility
-    
-    # Préférer la moyenne Bid/Ask, sinon Last Price
-    market_price_bid = target_option['bid'].iloc[0]
-    market_price_ask = target_option['ask'].iloc[0]
-    market_price_last = target_option['lastPrice'].iloc[0]
-
-    market_price = np.nan # Initialiser à NaN
-
-    # Utiliser np.isnan au lieu de pd.notna pour plus de robustesse avec les scalaires numpy
-    if not np.isnan(market_price_bid) and not np.isnan(market_price_ask) and market_price_bid > 0 and market_price_ask > 0:
-        market_price = (market_price_bid + market_price_ask) / 2
-        print(f"IV Calc Info: Using Bid/Ask price ({market_price:.2f}) for {ticker} {strike} {expiry_date_str}.")
-    elif not np.isnan(market_price_last) and market_price_last > 0:
-        market_price = market_price_last
-        print(f"IV Calc Info: Using Last Price ({market_price:.2f}) for {ticker} {strike} {expiry_date_str}.")
-    else:
-        print(f"IV Calc Warning: No valid market price (bid/ask/lastPrice > 0) found for {ticker} {strike} {expiry_date_str}. Using default volatility.")
-        return default_volatility
-    
-    # 5. Calculer la volatilité implicite avec la méthode de dichotomie
-    if np.isnan(market_price) or market_price <= 0: # <-- CORRECTION ICI : Utilisation de np.isnan
-        print(f"IV Calc Warning: Invalid market price ({market_price}) for {ticker} {strike} {expiry_date_str}. Using default volatility.")
-        return default_volatility
-
-    iv = find_implied_volatility_bisection(market_price, current_spot_price, strike, T, risk_free_rate, dividend_yield)
-    
-    if np.isnan(iv): # <-- CORRECTION ICI : Utilisation de np.isnan
-        print(f"IV Calc Warning: Failed to converge or invalid parameters for IV for {ticker} {strike} {expiry_date_str}. Using default volatility.")
-        return default_volatility
-    
-    print(f"IV Calc Success: Implied Volatility for {ticker} {strike} {expiry_date_str}: {iv:.4f}")
-    return iv
 
 
 # Pour tester ce module indépendamment
@@ -177,7 +146,6 @@ if __name__ == "__main__":
         yf_ticker = yf.Ticker(test_ticker)
         
         # --- Tenter de récupérer le prix actuel via .info d'abord ---
-        # C'est souvent plus fiable pour un prix unique et actuel, surtout hors heures de marché.
         ticker_info = yf_ticker.info
         if 'currentPrice' in ticker_info and pd.notna(ticker_info['currentPrice']):
             test_S = float(ticker_info['currentPrice'])
@@ -186,44 +154,80 @@ if __name__ == "__main__":
             print(f"currentPrice not found in .info or is invalid for {test_ticker}. Falling back to .download().")
             
             # --- Fallback vers .download() si .info a échoué ---
-            # Utiliser period="5d" pour augmenter les chances d'obtenir des données historiques valides
             yf_data = yf.download(test_ticker, period="5d", progress=False, actions=False) 
             
             if not yf_data.empty:
-                # Prioriser 'Adj Close', sinon 'Close'
                 if 'Adj Close' in yf_data.columns:
                     temp_S = yf_data['Adj Close'].iloc[-1]
                 elif 'Close' in yf_data.columns:
                     temp_S = yf_data['Close'].iloc[-1]
                 else:
                     print(f"Could not find 'Adj Close' or 'Close' column in downloaded data for {test_ticker}.")
-                    temp_S = np.nan # Assigner NaN si aucune colonne trouvée
-
-                if pd.notna(temp_S): # Vérifier si la valeur temporaire n'est pas NaN
-                    test_S = float(temp_S) # Convertir explicitement en float
+                    temp_S = np.nan
+                if pd.notna(temp_S):
+                    test_S = float(temp_S)
                     print(f"Current spot price for {test_ticker} fetched from .download(): {test_S:.2f}")
                 else:
                     print(f"Failed to retrieve a valid numeric spot price for {test_ticker} from .download().")
-                    test_S = None # S'assurer que test_S est None si non valide
+                    test_S = None
             else:
                 print(f"No data downloaded for {test_ticker} for period '5d'.")
                 test_S = None
 
     except Exception as e:
-        # Afficher l'exception de manière plus robuste pour éviter l'erreur "ambiguous truth value"
-        # repr(e) donne la représentation 'officielle' de l'objet, qui est toujours une chaîne.
         print(f"Error fetching spot price for {test_ticker}: {repr(e)}. Skipping IV test.")
-        test_S = None # Indiquer l'échec
+        test_S = None
 
     if test_S is not None: # Assurez-vous que test_S est un nombre valide avant de continuer
         test_r = 0.0441
         test_q = 0.00
 
-        calculated_iv = get_implied_volatility_for_option(
-            test_ticker, test_strike, test_expiry, test_S, test_r, test_q
-        )
+        # --- CALCUL DU TEMPS JUSQU'À ÉCHÉANCE POUR LE TEST ---
+        today_for_test = datetime.now()
+        expiry_dt_for_test = datetime.strptime(test_expiry, "%Y-%m-%d")
+        days_to_expiry_for_test = (expiry_dt_for_test - today_for_test).days
+        T_for_test = days_to_expiry_for_test / 365.0
+        
+        # --- NOUVEAU : Simuler un market_price réaliste en utilisant Black-Scholes ---
+        # On utilise une volatilité estimée pour générer un prix cohérent
+        estimated_volatility_for_test = 0.50 # Volatilité de 50% pour le test, une valeur plausible pour NVDA
+        
+        # S'assurer que T_for_test est > 0 pour black_scholes_call
+        if T_for_test <= 0:
+            print("Erreur: Le temps jusqu'à l'échéance est nul ou négatif pour le test.")
+            test_market_price = np.nan # Rendre le prix invalide
+        else:
+            test_market_price = black_scholes_call(
+                S=test_S, 
+                K=test_strike, 
+                T=T_for_test, 
+                r=test_r, 
+                sigma=estimated_volatility_for_test, 
+                q=test_q
+            )
+            print(f"Simulated Black-Scholes price for {test_ticker} Call {test_strike} {test_expiry} with sigma={estimated_volatility_for_test:.2f}: {test_market_price:.2f}")
+
+
+        # Vérifiez que test_market_price est valide avant de l'utiliser pour l'IV
+        if pd.isna(test_market_price) or test_market_price <= 0:
+            print(f"Simulated market price for test is invalid ({test_market_price}). Cannot calculate IV.")
+            calculated_iv = np.nan # Assurer que l'IV sera NaN si le prix est invalide
+        else:
+            calculated_iv = get_implied_volatility_for_option(
+                ticker=test_ticker,
+                strike=test_strike,
+                expiry=test_expiry,
+                spot_price=test_S,
+                risk_free_rate=test_r,
+                dividend_yield=test_q,
+                option_type="call", 
+                market_price=test_market_price 
+            )
+
         if pd.notna(calculated_iv):
             print(f"Volatilité implicite calculée pour {test_ticker} Call {test_strike} {test_expiry}: {calculated_iv:.4f}")
+            # Vous pouvez même vérifier si la IV retrouvée est proche de estimated_volatility_for_test
+            print(f"La volatilité retrouvée ({calculated_iv:.4f}) devrait être proche de la volatilité d'entrée ({estimated_volatility_for_test:.4f}).")
         else:
             print(f"Échec du calcul de la volatilité implicite pour {test_ticker} Call {test_strike} {test_expiry}. Une valeur par défaut a été utilisée.")
     else:
